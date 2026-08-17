@@ -1,0 +1,53 @@
+version: "3.8"
+
+# 刷题通 shuatipass docker-compose
+#
+# 用法:
+#   # 1. 把 PDF 放到 ./data/input/
+#   cp your.pdf ./data/input/
+#
+#   # 2. 启动解析
+#   docker compose run --rm shuatipass parse input/your.pdf -o output/result.json --images output/images
+#
+#   # 3. 看统计
+#   docker compose run --rm shuatipass stats output/result.json
+
+services:
+  shuatipass:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shuatipass:0.1.0
+    container_name: shuatipass
+    volumes:
+      # 挂载数据目录
+      - ./data/input:/data/input:ro     # 输入 PDF（只读）
+      - ./data/output:/data/output       # 输出 JSON + 图片
+      - ./data/parsed:/data/parsed       # 解析结果（备用位置）
+    environment:
+      # Python 输出不缓冲（实时看日志）
+      - PYTHONUNBUFFERED=1
+    # 默认命令
+    command: ["--help"]
+
+  # 可选：批量处理 service
+  batch:
+    profiles: ["batch"]  # 默认不启动，用 docker compose --profile batch up
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data/input:/data/input:ro
+      - ./data/output:/data/output
+    environment:
+      - PYTHONUNBUFFERED=1
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        for pdf in /data/input/*.pdf; do
+          if [ -f "$$pdf" ]; then
+            echo "Processing: $$pdf"
+            shuatipass parse "$$pdf" -o "/data/output/$$(basename $$pdf .pdf).json" \
+              --images /data/output/"$$(basename $$pdf .pdf)_images"
+          fi
+        done

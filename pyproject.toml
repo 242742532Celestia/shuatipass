@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shuatipass"
+version = "0.1.0"
+description = "中文题库 PDF 解析工具 - 把 PDF 一键转结构化 JSON"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Mavis / shuatipass contributors"},
+]
+keywords = ["pdf", "题库", "教育", "中文", "parser", "xuekewang", "zujuan", "textbook"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+    "Topic :: Text Processing :: Markup",
+    "Operating System :: OS Independent",
+    "Natural Language :: Chinese (Simplified)",
+    "Natural Language :: Chinese (Traditional)",
+]
+dependencies = [
+    "PyMuPDF>=1.28.0",
+    "Pillow>=10.0.0",
+    "PyYAML>=5.0",
+    "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "build>=1.0",
+    "twine>=4.0",
+]
+web = [
+    "gradio>=4.0",
+]
+ocr = [
+    "pix2tex>=0.1.0",
+]
+all = [
+    "shuatipass[dev,web,ocr]",
+]
+
+[project.scripts]
+shuatipass = "shuatipass.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourname/shuatipass"
+Documentation = "https://github.com/yourname/shuatipass#readme"
+Repository = "https://github.com/yourname/shuatipass"
+Issues = "https://github.com/yourname/shuatipass/issues"
+Changelog = "https://github.com/yourname/shuatipass/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+shuatipass = ["py.typed"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# 包括 configs 目录
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.data-files]
+"configs" = ["configs/*.yaml"]
+
+# Pytest 配置
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow",
+    "docker: marks tests that require docker",
+]
+
+# Black 配置
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+# Ruff 配置
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]  # line too long

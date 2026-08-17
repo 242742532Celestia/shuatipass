@@ -1,0 +1,22 @@
+# 刷题通 shuatipass —— Python 依赖
+# 基础包（D1 已用）
+PyMuPDF>=1.28.0
+Pillow>=10.0.0
+
+# 排版（D4 起）
+reportlab>=4.0.0
+
+# FastAPI Web（D7 起）
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+jinja2>=3.1.0
+
+# 数据库
+SQLAlchemy>=2.0.0
+
+# 公式 OCR（D3 起，可选）
+# pix2tex>=0.1.0  # GPU 推理较重，先不装
+
+# AI 客户端（D6 起）
+openai>=1.40.0

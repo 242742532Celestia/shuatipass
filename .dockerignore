@@ -1,0 +1,43 @@
+# 排除不需要的文件，减小构建上下文
+.git
+.gitignore
+.github
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+*.egg-info
+build
+dist
+*.tar.gz
+*.zip
+
+# 文档（不打包进镜像）
+docs/
+
+# 测试
+tests/
+
+# 数据（用户运行时挂载）
+data/parsed
+data/images
+data/output
+data/input/*.pdf
+
+# IDE
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# 临时文件
+*.tmp
+*.bak

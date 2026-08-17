@@ -1,0 +1,48 @@
+# 组卷网（zujuan.com）格式 PDF 题库解析配置
+#
+# 组卷网典型排版:
+#   - 页眉: "学科网组卷 / 组卷网 / 一组卷" 之一
+#   - 题目: "1．题干..." 或 "1、题干..."
+#   - 选项: "A．..." 独占行
+#   - 没有标准"专题XX / N"页眉
+#
+# 通用配置 (generic) 已经能识别大部分组卷网 PDF
+# 这个配置做了更精确的组卷网特定调整
+
+name: 组卷网
+description: 组卷网（zujuan.com）格式 PDF 解析配置
+
+# 题目识别：组卷网常用 "1．" 或 "1、"
+# 不强求年份+省份（组卷网经常省略）
+question_pattern: '^(\d+)\s*[．\.、]\s*(.{15,})'
+option_pattern: '^([A-D])[．\.]\s*(.*)$'
+
+# 组卷网通常没有"专题"概念
+header_pattern: ''
+has_question_pattern: '^\d+\s*[．\.、]'
+topic_title_pattern: ''
+
+option_keys: [A, B, C, D]
+essay_keywords:
+  - 求
+  - 证明
+  - 计算
+  - 解答
+  - "解:"
+  - "解："
+  - （1）
+  - (1)
+  - ①
+  - ②
+
+# 组卷网特有的跳过词
+skip_patterns:
+  - '组\s*卷\s*网'
+  - '学科网'
+  - '组卷'
+  - 'www\.zujuan\.com'
+  - 'zujuan'
+
+skip_exact_lines:
+  - 组卷网
+  - 学科网（北京）股份有限公司

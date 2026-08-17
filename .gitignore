@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.eggs/
+
+# Virtual envs
+venv/
+env/
+ENV/
+.venv
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+coverage.xml
+*.cover
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Secrets - NEVER commit
+.env
+.env.local
+*.key
+*.pem
+config.json
+secrets.yaml
+
+# Data - user uploaded PDFs and test fixtures
+data/
+!data/.gitkeep
+*.pdf
+!docs/**/*.pdf
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+*.whl
+*.tar.gz
+
+# Generated
+shuatipass.egg-info/
+.coverage
+.mypy_cache/
+.ruff_cache/
+
+# OS
+Thumbs.db
+.DS_Store
