@@ -52,8 +52,28 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     # 没配 token 就不发。skipped ≠ 失败，Release workflow 不再常驻红叉。
-    if: ${{ secrets.PYPI_API_TOKEN != '' }}
+    #
+    # 🔴🔴 但**不能**写成 job 级的 `if: ${{ secrets.PYPI_API_TOKEN != '' }}`：
+    # GitHub 的上下文可用性表里，`jobs.<job_id>.if` 只允许
+    # github / needs / vars / inputs —— **没有 secrets**。
+    # 用了 secrets，GitHub 会把**整个 workflow 文件判为非法**：
+    #   · workflow 名字退化成文件路径（列表里显示成 ".github/workflows/release.yml"）
+    #   · 每一次 push 都会创建一个 0 秒失败的 run，提示 "workflow file issue"
+    # 而 secrets 在 **steps.*.env** 里是允许的 ⇒ 先在步骤里算出布尔值，
+    # 再用步骤级 if 判断。
     steps:
+      - name: Check PyPI token
+        id: token
+        env:
+          HAS_TOKEN: ${{ secrets.PYPI_API_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" = "true" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::没有配置 PYPI_API_TOKEN —— 跳过 PyPI 发布（这是跳过，不是失败）"
+          fi
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -61,6 +81,7 @@ jobs:
           path: dist
 
       - name: Publish to PyPI
+        if: steps.token.outputs.available == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
