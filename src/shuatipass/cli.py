@@ -6,19 +6,21 @@ shuatipass CLI 入口
   shuatipass stats <json>
   shuatipass info <pdf>
 """
+
 import argparse
 import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+
+from ._console import enable_console_compat
 
 
 def cmd_parse(args):
     """解析 PDF → JSON"""
-    from .parser import XueKeWangParser
     from .config import ParseConfig, get_builtin, list_builtins
-    from .detect import detect_config, detect_with_details
+    from .detect import detect_config
+    from .parser import XueKeWangParser
 
     if not Path(args.pdf).exists():
         print(f"❌ PDF 不存在: {args.pdf}", file=sys.stderr)
@@ -63,7 +65,7 @@ def cmd_parse(args):
         config = None
         config_name = "xuekewang (默认)"
         print(f"📄 解析: {args.pdf}")
-        print(f"   配置: 默认 (xuekewang)")
+        print("   配置: 默认 (xuekewang)")
 
     print(f"   输出: {args.out}")
     print(f"   图片: {images}")
@@ -72,14 +74,17 @@ def cmd_parse(args):
     result = parser.parse()
 
     from dataclasses import asdict
+
     data = asdict(result)
     with out.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     stats = result.stats
     print()
-    print(f"✅ 解析完成")
-    print(f"   专题: {stats['total_topics']} | 题目: {stats['total_questions']} | 跳过: {stats['skipped_pages']} 页")
+    print("✅ 解析完成")
+    print(
+        f"   专题: {stats['total_topics']} | 题目: {stats['total_questions']} | 跳过: {stats['skipped_pages']} 页"
+    )
     print(f"   题型: {stats['by_type']}")
 
     # 提示
@@ -98,7 +103,7 @@ def cmd_stats(args):
     if not p.exists():
         print(f"❌ JSON 不存在: {p}", file=sys.stderr)
         return 1
-    with p.open() as f:
+    with p.open(encoding="utf-8") as f:
         data = json.load(f)
 
     print(f"📊 {p.name}")
@@ -129,7 +134,9 @@ def cmd_stats(args):
     print("   专题分布:")
     for t in data["topics"]:
         n = len(t["questions"])
-        print(f"     专题 {t['topic_id']} {t['title']:<22} p{t['page_start']:>3}-{t['page_end']:<3}  {n} 题")
+        print(
+            f"     专题 {t['topic_id']} {t['title']:<22} p{t['page_start']:>3}-{t['page_end']:<3}  {n} 题"
+        )
     return 0
 
 
@@ -163,6 +170,7 @@ def cmd_info(args):
 def cmd_configs(args):
     """列出可用配置"""
     from .config import list_builtins
+
     names = list_builtins()
     if not names:
         print("❌ 没有内置配置")
@@ -175,7 +183,7 @@ def cmd_configs(args):
 
 def cmd_ocr(args):
     """对已解析的 JSON 跑公式 OCR"""
-    from .ocr import MathpixOCR, Pix2TexOCR, ocr_questions, OCRError, make_ocr_from_env
+    from .ocr import MathpixOCR, OCRError, Pix2TexOCR, make_ocr_from_env, ocr_questions
 
     if not Path(args.json).exists():
         print(f"❌ JSON 不存在: {args.json}", file=sys.stderr)
@@ -225,7 +233,7 @@ def cmd_ocr(args):
     )
 
     print()
-    print(f"✅ OCR 完成")
+    print("✅ OCR 完成")
     print(f"   总题目: {stats['total_questions']}")
     print(f"   总图片: {stats['total_images']}")
     print(f"   OCR 调用: {stats['ocr_called']}")
@@ -237,18 +245,18 @@ def cmd_ocr(args):
 
 def cmd_web(args):
     """启动 Web UI"""
-    from .web import launch_web, is_available
+    from .web import is_available, launch_web
 
     if not is_available():
         print("❌ 需要安装 gradio: pip install gradio", file=sys.stderr)
         print("   或: pip install shuatipass[web]", file=sys.stderr)
         return 1
 
-    print(f"🌐 启动 Web UI")
+    print("🌐 启动 Web UI")
     print(f"   地址: http://{args.host}:{args.port}")
     if args.share:
-        print(f"   公网分享: 启动后会生成临时链接（72h 有效）")
-    print(f"   按 Ctrl+C 停止")
+        print("   公网分享: 启动后会生成临时链接（72h 有效）")
+    print("   按 Ctrl+C 停止")
     print()
 
     try:
@@ -268,6 +276,9 @@ def cmd_web(args):
 
 
 def main():
+    # 🔴 Windows 控制台（GBK）编码不了 emoji，且 stdout 被重定向时是 strict
+    # ⇒ 第一个 📋 就会 UnicodeEncodeError 崩掉。放宽错误字符，不改码页。
+    enable_console_compat()
     parser = argparse.ArgumentParser(
         prog="shuatipass",
         description="中文题库 PDF 解析工具 - 把 PDF 一键转结构化 JSON",
@@ -303,7 +314,9 @@ def main():
     p_ocr.add_argument("json", help="输入 JSON 路径")
     p_ocr.add_argument("-o", "--out", default=None, help="输出 JSON 路径（默认 <input>.ocr.json）")
     p_ocr.add_argument("--images", required=True, help="图片目录")
-    p_ocr.add_argument("--engine", choices=["mathpix", "pix2tex"], default="mathpix", help="OCR 引擎")
+    p_ocr.add_argument(
+        "--engine", choices=["mathpix", "pix2tex"], default="mathpix", help="OCR 引擎"
+    )
     p_ocr.add_argument("--app-id", help="Mathpix app_id（或环境变量 MATHPIX_APP_ID）")
     p_ocr.add_argument("--app-key", help="Mathpix app_key（或环境变量 MATHPIX_APP_KEY）")
     p_ocr.add_argument("--rate-limit", type=float, default=1.0, help="API 调用间隔（秒）")
@@ -321,14 +334,26 @@ def main():
     p_gen.add_argument("-o", "--out", required=True, help="输出 JSON 路径")
     p_gen.add_argument("--seed", help="种子题 JSON（提供则学习其风格）")
     p_gen.add_argument("--topic", help="知识点（如'圆周运动'）")
-    p_gen.add_argument("--difficulty", choices=["easy", "medium", "hard", "expert"],
-                       default="medium", help="难度（默认 medium）")
+    p_gen.add_argument(
+        "--difficulty",
+        choices=["easy", "medium", "hard", "expert"],
+        default="medium",
+        help="难度（默认 medium）",
+    )
     p_gen.add_argument("--count", type=int, default=5, help="生成题数（默认 5）")
-    p_gen.add_argument("--type", choices=["single_choice", "multi_choice", "essay"],
-                       default="single_choice", help="题型（默认 single_choice）")
+    p_gen.add_argument(
+        "--type",
+        choices=["single_choice", "multi_choice", "essay"],
+        default="single_choice",
+        help="题型（默认 single_choice）",
+    )
     p_gen.add_argument("--subject", default="物理", help="学科（默认 物理）")
-    p_gen.add_argument("--provider", choices=["minimax", "openai", "anthropic"],
-                       default="minimax", help="LLM provider（默认 minimax）")
+    p_gen.add_argument(
+        "--provider",
+        choices=["minimax", "openai", "anthropic"],
+        default="minimax",
+        help="LLM provider（默认 minimax）",
+    )
     p_gen.add_argument("--model", help="模型名（默认用 provider 默认）")
     p_gen.add_argument("--temperature", type=float, default=0.7, help="创造性 0-1")
     p_gen.add_argument("--mock-exam", action="store_true", help="生成模拟卷（从 seed 抽题学习）")
@@ -342,8 +367,12 @@ def main():
     p_mimic.add_argument("-o", "--out", required=True, help="输出 JSON 路径")
     p_mimic.add_argument("--count", type=int, help="目标题数（默认跟原卷一致）")
     p_mimic.add_argument("--subject", default="物理", help="学科（默认 物理）")
-    p_mimic.add_argument("--provider", choices=["minimax", "openai", "anthropic"],
-                         default="minimax", help="LLM provider")
+    p_mimic.add_argument(
+        "--provider",
+        choices=["minimax", "openai", "anthropic"],
+        default="minimax",
+        help="LLM provider",
+    )
     p_mimic.add_argument("--model", help="模型名")
     p_mimic.set_defaults(func=cmd_exam_mimic)
 
@@ -367,9 +396,12 @@ def main():
     p_wb_export.add_argument("--out-html", help="输出 HTML 路径")
     p_wb_export.add_argument("--ids", help="题目 ID 列表（逗号分隔）")
     p_wb_export.add_argument("--tag", default="错题", help="按 tag 过滤（默认 '错题'）")
-    p_wb_export.add_argument("--group-by", default="knowledge_point",
-                             choices=["knowledge_point", "topic", "year", "difficulty"],
-                             help="分组方式")
+    p_wb_export.add_argument(
+        "--group-by",
+        default="knowledge_point",
+        choices=["knowledge_point", "topic", "year", "difficulty"],
+        help="分组方式",
+    )
     p_wb_export.add_argument("--title", default="错题本", help="HTML 标题")
     p_wb_export.set_defaults(func=cmd_wrongbook_export)
 
@@ -388,16 +420,16 @@ def main():
 def cmd_generate(args):
     """AI 出题"""
     from .generator import (
-        generate_questions,
-        generate_mock_exam,
-        save_to_json,
         PROVIDERS,
+        generate_mock_exam,
+        generate_questions,
+        save_to_json,
     )
 
     provider = args.provider
     model = args.model or PROVIDERS[provider]["default_model"]
 
-    print(f"🤖 AI 出题")
+    print("🤖 AI 出题")
     print(f"   Provider: {provider}/{model}")
     print(f"   难度: {args.difficulty}")
     print(f"   数量: {args.count}")
@@ -445,21 +477,23 @@ def cmd_generate(args):
         if not seed_path.exists():
             print(f"❌ seed JSON 不存在: {args.seed}", file=sys.stderr)
             return 1
-        with seed_path.open() as f:
+        with seed_path.open(encoding="utf-8") as f:
             seed_data = json.load(f)
         seed_questions = []
         for t in seed_data.get("topics", []):
             for q in t.get("questions", []):
-                seed_questions.append({
-                    "id": q.get("id"),
-                    "topic_title": t.get("title"),
-                    "stem": q.get("stem"),
-                    "options": q.get("options"),
-                    "year": q.get("year"),
-                    "province": q.get("province"),
-                })
+                seed_questions.append(
+                    {
+                        "id": q.get("id"),
+                        "topic_title": t.get("title"),
+                        "stem": q.get("stem"),
+                        "options": q.get("options"),
+                        "year": q.get("year"),
+                        "province": q.get("province"),
+                    }
+                )
         if not seed_questions:
-            print(f"⚠️  seed JSON 里没找到题目")
+            print("⚠️  seed JSON 里没找到题目")
         else:
             print(f"   种子题: {len(seed_questions)} 道")
 
@@ -544,7 +578,7 @@ def cmd_exam_mimic(args):
 
         # 打印风格报告
         style = result["style"]
-        print(f"\n📊 风格分析报告:")
+        print("\n📊 风格分析报告:")
         print(f"   原卷总题: {style['total_questions']}")
         print(f"   估计时长: {style['estimated_duration']} 分钟")
         print(f"   估计总分: {style['estimated_score']} 分")
@@ -574,7 +608,7 @@ def cmd_wrongbook_mark(args):
             output=args.out,
         )
         verb = "标记" if args.action == "mark" else "取消标记"
-        n = result['marked'] if args.action == 'mark' else result['unmarked']
+        n = result["marked"] if args.action == "mark" else result["unmarked"]
         print(f"🏷️  {verb}: {n} 道题")
         if result["not_found"]:
             print(f"⚠️  未找到: {result['not_found']}")
@@ -594,7 +628,7 @@ def cmd_wrongbook_export(args):
         ids = [i.strip() for i in args.ids.split(",") if i.strip()]
 
     try:
-        result = export_wrongbook(
+        export_wrongbook(
             source_json=args.json,
             output_json=args.out_json,
             output_html=args.out_html,

@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: shuatipass:0.1.0
+    image: shuatipass:0.1.1
     container_name: shuatipass
     volumes:
       # 挂载数据目录

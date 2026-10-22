@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +38,12 @@ jobs:
       - name: Run tests
         run: |
           pytest --cov=shuatipass --cov-report=xml --cov-report=term -v
+
+      - name: Check test counts in docs
+        # 🔴 文档里的测试数必须是实跑出来的，不能手抄。
+        # 仓库从 51 个用例长到 110 个之后，docs/publish.md 还写着「51 个」，
+        # 没有任何东西会报错 —— 这里加一条机械检查把它盯住。
+        run: python scripts/check_test_counts.py
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'  # 只在主版本上传
@@ -65,16 +71,40 @@ jobs:
 
       - name: Black check
         run: |
-          black --check src/ tests/
+          black --check src/ tests/ scripts/
 
       - name: Ruff check
         run: |
-          ruff check src/ tests/
+          ruff check src/ tests/ scripts/
+
+  web:
+    name: Web UI (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[web,dev]"
+
+      - name: Run web tests
+        # 🔴 为什么单开一个 job：主 matrix 只装 [dev]（不装 gradio），是为了让
+        # 3 个 Python 版本跑得快。但 **Web UI 的接线只有装上 gradio 才测得到** ——
+        # "outputs 的长度/顺序 和 回调返回值对不上" 这类 bug 就是这么藏住的
+        # （gradio 只在**点击时**才校验数量，build 阶段不报错）。
+        run: pytest tests/test_web.py -v
 
   build:
     name: Build distribution
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [test, lint, web]
     steps:
       - uses: actions/checkout@v4
 
@@ -87,7 +117,10 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          # 🔴 原来只装了 build，却跑 `python -m twine check` ——
+          # twine 没装 → ModuleNotFoundError。这个 job 之前一直被
+          # "needs: [test, lint]" 挡着从没跑过，所以没暴露；test/lint 一绿就会炸。
+          pip install build twine
 
       - name: Build sdist and wheel
         run: |

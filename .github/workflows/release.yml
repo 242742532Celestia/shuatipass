@@ -5,12 +5,22 @@ on:
     tags:
       - "v*.*.*"
 
+# 🔴 三个 job 的分工（2026-10-22 重构）
+# --------------------------------------------------------------
+# 原来的写法有两个真 bug：
+#   ① `github-release` job 直接贴 `dist/*.whl`，但 dist/ 是**另一个 job** 的产物
+#      —— 它自己从不 build ⇒ v0.1.0 那个 Release 的 assets 是 **0**（发布页是个空壳）。
+#   ② PyPI 用 OIDC 信任发布，而项目没在 PyPI 侧注册 ⇒ 必挂，
+#      于是整个 Release workflow 常驻一个红叉。
+#
+# 改成：build 一次 → 产物走 artifact → 两个下游 job 各自消费。
+#   build         打包 + twine check + 上传 artifact
+#   publish-pypi  没配 PYPI_API_TOKEN 就 **跳过**（并在日志里明确告警，而不是假装成功）
+#   github-release 贴上 wheel + sdist（这次真有附件了）
 jobs:
-  release:
-    name: Release to PyPI
+  build:
+    name: Build distribution
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # for PyPI trusted publishing
     steps:
       - uses: actions/checkout@v4
 
@@ -23,27 +33,57 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          pip install build twine
 
       - name: Build
         run: python -m build
 
+      - name: Check distributions
+        run: python -m twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build]
+    runs-on: ubuntu-latest
+    # 没配 token 就不发。skipped ≠ 失败，Release workflow 不再常驻红叉。
+    if: ${{ secrets.PYPI_API_TOKEN != '' }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   github-release:
     name: Create GitHub Release
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             dist/*.whl
             dist/*.tar.gz

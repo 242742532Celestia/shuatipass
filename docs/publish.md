@@ -21,17 +21,36 @@ export TWINE_USERNAME="__token__"
 export TWINE_PASSWORD="pypi-xxxxxxxxxxxxxxxxxxxx"  # 你的 token
 ```
 
-### 3. （推荐）Trusted Publishing
+### 3. 🔴 在 GitHub 上配置 PyPI Token（**必做，否则 PyPI 发布会被跳过**）
 
-更安全的方案 —— 在 GitHub 上配 trusted publishing：
+这一步是 2026-10-22 之前 v0.1.0 发布一直失败的原因。`release.yml` 现在从
+**仓库 secret** 里读 token（不是环境变量）：
+
+1. 打开仓库 → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+2. Name: `PYPI_API_TOKEN`
+3. Secret: 粘贴第 2 步生成的 token（形如 `pypi-AgEIcHlwaS5vcmc...`）
+4. 保存
+
+**没配会怎样**：`publish-pypi` 这个 job 会被**跳过（skipped）**，不是失败 ——
+这样 Release workflow 不会常驻一个红叉，但**包也不会真的发到 PyPI**，
+日志里会有一条明确告警。想真的发布就必须配这个 secret。
+
+### 4.（可选）Trusted Publishing
+
+更安全的方案 —— 不用存 token，让 GitHub Action 用 OIDC 身份认证：
 
 1. PyPI 项目页 → Publishing → Add a new pending publisher
 2. 填：
-   - Owner: `yourname`
+   - Owner: `your-pypi-username`
    - Repository: `shuatipass`
    - Workflow file: `release.yml`
    - Environment name: `pypi`
-3. 这样不用 token，GitHub Action 自动认证
+3. 然后把 `release.yml` 里的 `publish-pypi` job 改成用 OIDC（去掉 `password:` 输入、
+   保留 `permissions: id-token: write`），并去掉 `if:` 条件
+
+⚠️ 用信任发布的前提是 **PyPI 上已经存在 `shuatipass` 这个项目**。
+项目还不存在时，OIDC 会直接失败 —— 这正是 v0.1.0 那次发布红掉的原因。
+**首次发布建议走第 3 步的 token 方式**，等项目在 PyPI 上建好后再切信任发布。
 
 ## 发布流程
 
@@ -74,9 +93,14 @@ git push origin v0.1.0
 ```
 
 会自动：
-1. Build sdist + wheel
-2. 推送到 PyPI
-3. 创建 GitHub Release
+
+1. **Build** —— 打包 sdist + wheel，跑 `twine check`，把产物存成 artifact
+2. **Publish to PyPI** —— 需要 `PYPI_API_TOKEN` secret；没配则**跳过**（不是失败）
+3. **Create GitHub Release** —— 把 wheel + sdist 贴到 Release 页上
+
+> 2026-10-22 之前，第 3 步是坏的：它直接贴 `dist/*.whl`，但 `dist/` 是另一个 job 的产物，
+> 而它自己从不 build ⇒ v0.1.0 那个 Release 的附件数是 **0**，发布页是个空壳。
+> 现在改成 build 一次 → artifact → 两个下游 job 各取所需。
 
 ## 发布后验证
 
@@ -90,6 +114,11 @@ pip install shuatipass
 # 3. 测试
 shuatipass --version
 shuatipass info your.pdf
+
+# 4. 🔴 确认内置配置跟着包装上了（v0.1.0 的 wheel 就是死在这）
+#    configs/ 以前靠 data-files 装到包外，而代码找的是包内路径
+#    ⇒ 装完 get_builtin() 直接 FileNotFoundError，整个包解析不了任何 PDF
+shuatipass configs          # 应该列出 generic / textbook / xuekewang / zujuan
 ```
 
 ## 版本号规则
@@ -100,13 +129,13 @@ shuatipass info your.pdf
 - **次版本**（0.2.0）：向后兼容的新功能
 - **修订号**（0.1.1）：向后兼容的 bug fix
 
-**当前**：0.1.0（Alpha）
+**当前**：0.1.1（Alpha）
 
 ## 发布检查清单
 
 发布前确认：
 
-- [ ] 所有测试通过（51 个）
+- [ ] 所有测试通过（117 个用例；数字由 `scripts/check_test_counts.py` 实跑盯着，别手抄）
 - [ ] 文档已更新
 - [ ] CHANGELOG.md 加了版本段
 - [ ] pyproject.toml 版本号更新

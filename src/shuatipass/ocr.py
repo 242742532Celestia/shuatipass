@@ -20,17 +20,19 @@ JSON 字段扩展：
     question.formula_latex: "F = ma"  # 公式对应的 LaTeX
     question.formula_confidence: 0.95   # 置信度
 """
+
 from __future__ import annotations
-import json
+
 import base64
+import json
 import time
 from pathlib import Path
-from typing import Optional, Protocol
-from dataclasses import asdict
+from typing import Protocol
 
 # 顶层 import（方便 patch 测试）
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -38,6 +40,7 @@ except ImportError:
 
 class OCRError(Exception):
     """OCR 基础异常"""
+
     pass
 
 
@@ -116,7 +119,10 @@ class MathpixOCR:
         }
 
         resp = requests.post(
-            self.API_URL, headers=headers, json=payload, timeout=self.timeout,
+            self.API_URL,
+            headers=headers,
+            json=payload,
+            timeout=self.timeout,
         )
         if resp.status_code != 200:
             raise OCRError(f"Mathpix API 错误 {resp.status_code}: {resp.text}")
@@ -138,9 +144,10 @@ class Pix2TexOCR:
     def __init__(self):
         try:
             from pix2tex.cli import LatexOCR
+
             self.model = LatexOCR()
         except ImportError:
-            raise OCRError("需要安装 pix2tex: pip install pix2tex[dev]")
+            raise OCRError("需要安装 pix2tex: pip install pix2tex[dev]") from None
 
     @property
     def name(self) -> str:
@@ -150,7 +157,7 @@ class Pix2TexOCR:
         try:
             from PIL import Image
         except ImportError:
-            raise OCRError("需要安装 Pillow: pip install Pillow")
+            raise OCRError("需要安装 Pillow: pip install Pillow") from None
         img = Image.open(image_path)
         latex = self.model(img)
         # pix2tex 不返回 confidence，简单用空字符串占位
@@ -181,7 +188,7 @@ def ocr_questions(
     out_path = Path(output_json)
     img_dir = Path(images_dir)
 
-    with q_path.open() as f:
+    with q_path.open(encoding="utf-8") as f:
         data = json.load(f)
 
     stats = {
@@ -239,7 +246,8 @@ def ocr_questions(
 
 # === CLI 集成辅助 ===
 
-def make_ocr_from_env() -> Optional[FormulaOCR]:
+
+def make_ocr_from_env() -> FormulaOCR | None:
     """
     从环境变量创建 OCR 实例
 
@@ -248,6 +256,7 @@ def make_ocr_from_env() -> Optional[FormulaOCR]:
       MATHPIX_APP_KEY
     """
     import os
+
     app_id = os.environ.get("MATHPIX_APP_ID")
     app_key = os.environ.get("MATHPIX_APP_KEY")
     if app_id and app_key:

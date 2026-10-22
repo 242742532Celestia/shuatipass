@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shuatipass"
-version = "0.1.0"
+version = "0.1.1"
 description = "中文题库 PDF 解析工具 - 把 PDF 一键转结构化 JSON"
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 license = {text = "MIT"}
 authors = [
     {name = "Mavis / shuatipass contributors"},
@@ -57,17 +57,21 @@ all = [
 shuatipass = "shuatipass.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourname/shuatipass"
-Documentation = "https://github.com/yourname/shuatipass#readme"
-Repository = "https://github.com/yourname/shuatipass"
-Issues = "https://github.com/yourname/shuatipass/issues"
-Changelog = "https://github.com/yourname/shuatipass/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/242742532Celestia/shuatipass"
+Documentation = "https://github.com/242742532Celestia/shuatipass#readme"
+Repository = "https://github.com/242742532Celestia/shuatipass"
+Issues = "https://github.com/242742532Celestia/shuatipass/issues"
+Changelog = "https://github.com/242742532Celestia/shuatipass/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-shuatipass = ["py.typed"]
+# 🔴 configs 必须**跟着包走**（包内 shuatipass/configs/）。
+# 原来用 [tool.setuptools.data-files] 把它装到 <prefix>/configs（包外），
+# 而代码找的是 <package>/../../configs —— 装成 wheel 后两边对不上，
+# get_builtin() 直接 FileNotFoundError（详见 src/shuatipass/config.py:_builtin_dir）。
+shuatipass = ["py.typed", "configs/*.yaml"]
 
 [tool.setuptools.package-dir]
 "" = "src"
@@ -75,9 +79,6 @@ shuatipass = ["py.typed"]
 # 包括 configs 目录
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.data-files]
-"configs" = ["configs/*.yaml"]
 
 # Pytest 配置
 [tool.pytest.ini_options]
@@ -91,12 +92,12 @@ markers = [
 # Black 配置
 [tool.black]
 line-length = 100
-target-version = ["py310", "py311", "py312"]
+target-version = ["py310", "py311", "py312", "py313"]
 
 # Ruff 配置
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

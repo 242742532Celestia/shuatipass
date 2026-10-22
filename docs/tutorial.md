@@ -20,7 +20,7 @@ pip install shuatipass
 或从 GitHub 安装最新版：
 
 ```bash
-pip install git+https://github.com/yourname/shuatipass.git
+pip install git+https://github.com/242742532Celestia/shuatipass.git
 ```
 
 ## 最快上手：3 条命令
@@ -190,7 +190,7 @@ shuatipass parse input.pdf -o out.json --preset generic
 shuatipass parse input.pdf -o out.json --config my-rules.yaml
 ```
 
-最简配置（参考 `configs/generic.yaml`）：
+最简配置（参考 `src/shuatipass/configs/generic.yaml`）：
 
 ```yaml
 name: 我的教辅

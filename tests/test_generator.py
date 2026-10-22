@@ -1,21 +1,21 @@
 """shuatipass AI 出题测试"""
-import pytest
+
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from dataclasses import asdict
+from unittest.mock import patch
+
+import pytest
 
 from shuatipass.generator import (
+    DIFFICULTY_LEVELS,
+    PROVIDERS,
     GeneratedQuestion,
     build_prompt,
-    parse_llm_response,
-    generate_questions,
     generate_mock_exam,
+    generate_questions,
+    parse_llm_response,
     save_to_json,
-    PROVIDERS,
-    DIFFICULTY_LEVELS,
 )
-
 
 SAMPLE_JSON = Path(__file__).parent.parent / "data" / "parsed" / "questions.json"
 
@@ -88,18 +88,20 @@ class TestGenerateWithMock:
     """端到端：用 mock LLM 测 generate_questions"""
 
     def test_generate_questions_minimax(self):
-        mock_resp = json.dumps({
-            "questions": [
-                {
-                    "stem": "测试题干",
-                    "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
-                    "answer": "A",
-                    "explanation": "测试解析",
-                    "knowledge_point": "测试知识点",
-                    "difficulty": "medium",
-                }
-            ]
-        })
+        mock_resp = json.dumps(
+            {
+                "questions": [
+                    {
+                        "stem": "测试题干",
+                        "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
+                        "answer": "A",
+                        "explanation": "测试解析",
+                        "knowledge_point": "测试知识点",
+                        "difficulty": "medium",
+                    }
+                ]
+            }
+        )
 
         with patch("shuatipass.generator.call_llm", return_value=mock_resp):
             questions = generate_questions(
@@ -167,9 +169,7 @@ class TestSaveToJson:
         seed_path.write_text(json.dumps(seed), encoding="utf-8")
 
         # 生成题
-        new_qs = [
-            GeneratedQuestion(id="GEN-001", number=1, stem="新题", options={"A": "2"})
-        ]
+        new_qs = [GeneratedQuestion(id="GEN-001", number=1, stem="新题", options={"A": "2"})]
         out = tmp_path / "out.json"
         save_to_json(new_qs, out, append_to=seed_path)
 
@@ -186,12 +186,14 @@ class TestSaveToJson:
 class TestMockExam:
     @pytest.mark.skipif(not SAMPLE_JSON.exists(), reason="示例 JSON 不存在")
     def test_mock_exam_basic(self):
-        mock_resp = json.dumps({
-            "questions": [
-                {"stem": "题1", "options": {"A": "1"}, "answer": "A", "explanation": "e"},
-                {"stem": "题2", "options": {"A": "1"}, "answer": "B"},
-            ]
-        })
+        mock_resp = json.dumps(
+            {
+                "questions": [
+                    {"stem": "题1", "options": {"A": "1"}, "answer": "A", "explanation": "e"},
+                    {"stem": "题2", "options": {"A": "1"}, "answer": "B"},
+                ]
+            }
+        )
 
         with patch("shuatipass.generator.call_llm", return_value=mock_resp):
             data = generate_mock_exam(
@@ -232,39 +234,28 @@ class TestProviders:
 class TestCLI:
     """CLI 集成测试"""
 
-    def test_generate_help(self):
-        import subprocess
-        result = subprocess.run(
-            ["shuatipass", "generate", "--help"],
-            capture_output=True, text=True,
-        )
+    def test_generate_help(self, run_cli):
+        result = run_cli("generate", "--help")
         assert result.returncode == 0
         assert "--seed" in result.stdout
         assert "--topic" in result.stdout
         assert "--mock-exam" in result.stdout
 
-    def test_generate_no_key(self, tmp_path, monkeypatch):
+    def test_generate_no_key(self, tmp_path, monkeypatch, run_cli):
         """没 API key 时友好提示"""
         monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        import subprocess
-        result = subprocess.run(
-            ["shuatipass", "generate", "-o", str(tmp_path / "out.json"),
-             "--topic", "test"],
-            capture_output=True, text=True,
-        )
+
+        result = run_cli("generate", "-o", str(tmp_path / "out.json"), "--topic", "test")
         assert result.returncode != 0
         output = result.stdout + result.stderr
         assert "API_KEY" in output or "环境变量" in output
 
-    def test_generate_no_seed_no_topic(self, tmp_path, monkeypatch):
+    def test_generate_no_seed_no_topic(self, tmp_path, monkeypatch, run_cli):
         """--seed 和 --topic 都没给时报错"""
         monkeypatch.setenv("MINIMAX_API_KEY", "fake_key")
-        import subprocess
-        result = subprocess.run(
-            ["shuatipass", "generate", "-o", str(tmp_path / "out.json")],
-            capture_output=True, text=True,
-        )
+
+        result = run_cli("generate", "-o", str(tmp_path / "out.json"))
         # 因为没真 key，会先报"需要环境变量"或"需要 --topic"
         assert result.returncode != 0

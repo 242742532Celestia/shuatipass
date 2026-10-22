@@ -6,16 +6,16 @@ v4 改动：
 2. 把硬编码正则改成从 config 读
 3. 适配不同 PDF 来源
 """
+
 from __future__ import annotations
+
 import re
-import json
+from dataclasses import dataclass, field
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import Optional
+
 import pymupdf
 
 from .config import ParseConfig, get_builtin
-
 
 # 兼容老代码：导出原正则
 HEADER_RE = re.compile(r"专题\s*(\d+)\s+(\S+?)\s*\n\s*(\d+)\s*/\s*(\d+)\s*\n")
@@ -27,8 +27,18 @@ TOPIC_TITLE_LINE_RE = re.compile(r"专题\s*(\d+)\s+(\S+?)\s*$")
 HAS_QUESTION_RE = re.compile(r"\d+\s*[．\.]\s*[（(]\s*\d{4}\s*[·\.]")
 
 ESSAY_KEYWORDS = [
-    "求", "证明", "试求", "试证明", "计算", "解:", "解：",
-    "（1）", "(1)", "①", "②", "③",
+    "求",
+    "证明",
+    "试求",
+    "试证明",
+    "计算",
+    "解:",
+    "解：",
+    "（1）",
+    "(1)",
+    "①",
+    "②",
+    "③",
 ]
 
 
@@ -36,17 +46,17 @@ ESSAY_KEYWORDS = [
 class Question:
     id: str
     number: int
-    year: Optional[int] = None
-    province: Optional[str] = None
+    year: int | None = None
+    province: str | None = None
     type: str = "single_choice"
     stem: str = ""
     options: dict = field(default_factory=dict)
     images: list = field(default_factory=list)
     image_bboxes: list = field(default_factory=list)
-    answer: Optional[str] = None
-    explanation: Optional[str] = None
+    answer: str | None = None
+    explanation: str | None = None
     source_page: int = 0
-    bbox: Optional[list] = None
+    bbox: list | None = None
     cross_page: bool = False
 
 
@@ -76,7 +86,7 @@ class XueKeWangParser:
         self,
         pdf_path: str | Path,
         image_dir: str | Path,
-        config: Optional[ParseConfig] = None,
+        config: ParseConfig | None = None,
         config_name: str = "xuekewang",
     ):
         self.pdf_path = Path(pdf_path)
@@ -122,7 +132,7 @@ class XueKeWangParser:
             header_topic_id = header_match.group(1).zfill(2)
             if not cfg.has_question_re.search(page_text):
                 # 考点分析页：检查是否内嵌另一个专题名
-                lines = [l.strip() for l in page_text.split("\n")]
+                lines = [raw_line.strip() for raw_line in page_text.split("\n")]
                 reassigned = False
                 if cfg.topic_title_pattern:
                     for line in lines:
@@ -133,7 +143,9 @@ class XueKeWangParser:
                             break
                 if not reassigned:
                     page_topic_map[page_num] = None
-                    result.skipped_pages.append({"page": page_num, "reason": "考点分析页", "header_topic": header_topic_id})
+                    result.skipped_pages.append(
+                        {"page": page_num, "reason": "考点分析页", "header_topic": header_topic_id}
+                    )
                 continue
             page_topic_map[page_num] = header_topic_id
 
@@ -165,11 +177,9 @@ class XueKeWangParser:
             for page_num in info["pages"]:
                 self._parse_page(page_num, topic)
             if not topic.questions:
-                result.skipped_pages.append({
-                    "topic_id": tid,
-                    "title": info["title"],
-                    "reason": "空专题（仅有考点分析页）"
-                })
+                result.skipped_pages.append(
+                    {"topic_id": tid, "title": info["title"], "reason": "空专题（仅有考点分析页）"}
+                )
                 continue
             result.topics.append(topic)
 
@@ -197,7 +207,9 @@ class XueKeWangParser:
             if block.get("type") != 0:
                 continue
             x0, y0, x1, y1 = block["bbox"]
-            text = "".join(span["text"] for line in block.get("lines", []) for span in line.get("spans", []))
+            text = "".join(
+                span["text"] for line in block.get("lines", []) for span in line.get("spans", [])
+            )
             blocks.append((x0, y0, x1, y1, text))
 
         # 找本页所有题号 + y 坐标
@@ -210,9 +222,8 @@ class XueKeWangParser:
                 q_num = int(m.group(1))
                 if q_num not in question_ys:
                     question_ys[q_num] = by0
-        sorted_q_nums = sorted(question_ys.keys())
 
-        current_q: Optional[Question] = None
+        current_q: Question | None = None
         current_stem_lines: list[str] = []
         current_options: dict[str, str] = {}
 
@@ -234,7 +245,9 @@ class XueKeWangParser:
                     current_q.options = current_options
                     current_q.bbox = self._calc_bbox(current_q.number, question_ys, page_height)
                     if current_q.bbox:
-                        current_q.images, current_q.image_bboxes = self._assign_images(page_images, current_q.bbox)
+                        current_q.images, current_q.image_bboxes = self._assign_images(
+                            page_images, current_q.bbox
+                        )
                     topic.questions.append(current_q)
 
                 # 新题
@@ -256,11 +269,16 @@ class XueKeWangParser:
                         q_year = None
 
                 # 题干起始：去掉题目识别部分
-                rest = line[q_match.end():].strip()
+                rest = line[q_match.end() :].strip()
                 qid = f"{topic.topic_id}-{q_num:03d}"
                 current_q = Question(
-                    id=qid, number=q_num, year=q_year, province=q_province,
-                    source_page=page_num, images=[], image_bboxes=[],
+                    id=qid,
+                    number=q_num,
+                    year=q_year,
+                    province=q_province,
+                    source_page=page_num,
+                    images=[],
+                    image_bboxes=[],
                 )
                 current_stem_lines = [rest] if rest else []
                 current_options = {}
@@ -286,7 +304,7 @@ class XueKeWangParser:
                             break
                         if embedded_key not in cfg.option_keys:
                             break
-                        val = val[:m.start()].strip()
+                        val = val[: m.start()].strip()
                         current_options[key] = val
                         current_options[embedded_key] = embedded_val
                         key = embedded_key
@@ -315,7 +333,9 @@ class XueKeWangParser:
             current_q.options = current_options
             current_q.bbox = self._calc_bbox(current_q.number, question_ys, page_height)
             if current_q.bbox:
-                current_q.images, current_q.image_bboxes = self._assign_images(page_images, current_q.bbox)
+                current_q.images, current_q.image_bboxes = self._assign_images(
+                    page_images, current_q.bbox
+                )
             topic.questions.append(current_q)
 
     @staticmethod

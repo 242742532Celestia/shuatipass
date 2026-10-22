@@ -1,7 +1,10 @@
 """shuatipass 自动检测测试"""
-import pytest
+
 from pathlib import Path
-from shuatipass.detect import detect_config, detect_with_details, HAS_PYMUPDF
+
+import pytest
+
+from shuatipass.detect import HAS_PYMUPDF, detect_config, detect_with_details
 
 SAMPLE_PDF = Path(__file__).parent.parent / "data" / "input" / "物理-高考真题-学科网.pdf"
 
@@ -45,18 +48,21 @@ class TestBuiltinConfigs:
 
     def test_zujuan_loaded(self):
         from shuatipass.config import get_builtin
+
         cfg = get_builtin("zujuan")
         assert cfg.name == "组卷网"
         assert cfg.compile() is True
 
     def test_textbook_loaded(self):
         from shuatipass.config import get_builtin
+
         cfg = get_builtin("textbook")
         assert cfg.name == "教辅资料"
         assert cfg.compile() is True
 
     def test_list_4_builtins(self):
         from shuatipass.config import list_builtins
+
         names = list_builtins()
         assert "xuekewang" in names
         assert "generic" in names
@@ -69,15 +75,21 @@ class TestMultiFormatIntegration:
 
     @pytest.fixture
     def result_xk(self, tmp_path):
+        # 🔴 skip 必须在 fixture 里做：fixture 先于测试函数体执行，
+        # 写在测试体里的 pytest.skip() 根本来不及拦（示例 PDF 不在仓库里时
+        # 会变成 ERROR 而不是 SKIPPED）。
+        if not SAMPLE_PDF.exists():
+            pytest.skip("示例 PDF 不存在")
         from shuatipass import XueKeWangParser, get_builtin
+
         parser = XueKeWangParser(
-            SAMPLE_PDF, tmp_path / "imgs", config=get_builtin("xuekewang"),
+            SAMPLE_PDF,
+            tmp_path / "imgs",
+            config=get_builtin("xuekewang"),
         )
         return parser.parse()
 
     def test_xuekewang_works(self, result_xk):
-        if not SAMPLE_PDF.exists():
-            pytest.skip()
         assert result_xk.stats["total_questions"] > 500
 
     def test_zujuan_works_on_xk_pdf(self, tmp_path):
@@ -85,8 +97,11 @@ class TestMultiFormatIntegration:
         if not SAMPLE_PDF.exists():
             pytest.skip()
         from shuatipass import XueKeWangParser, get_builtin
+
         parser = XueKeWangParser(
-            SAMPLE_PDF, tmp_path / "imgs", config=get_builtin("zujuan"),
+            SAMPLE_PDF,
+            tmp_path / "imgs",
+            config=get_builtin("zujuan"),
         )
         result = parser.parse()
         # zujuan 配置会更多识别（不过滤考点分析页），所以题数可能更多

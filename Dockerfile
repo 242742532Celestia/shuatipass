@@ -52,6 +52,6 @@ CMD ["--help"]
 # Labels
 LABEL org.opencontainers.image.title="shuatipass"
 LABEL org.opencontainers.image.description="中文题库 PDF 解析工具 - 把 PDF 一键转结构化 JSON"
-LABEL org.opencontainers.image.source="https://github.com/yourname/shuatipass"
+LABEL org.opencontainers.image.source="https://github.com/242742532Celestia/shuatipass"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.version="0.1.1"

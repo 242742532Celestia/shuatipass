@@ -1,0 +1,15 @@
+{
+  "_comment": "pytest 实际收集到的用例数（由 scripts/check_test_counts.py 实跑生成，不是手抄的）。只记收集数，不记 passed/skipped —— 跳过数取决于本机有没有 docker / gradio / 示例 PDF，各环境不一样，断言它只会制造假红。",
+  "counts": {
+    "tests/test_config.py": 14,
+    "tests/test_console.py": 7,
+    "tests/test_detect.py": 9,
+    "tests/test_docker.py": 4,
+    "tests/test_exam_mimic.py": 30,
+    "tests/test_generator.py": 19,
+    "tests/test_ocr.py": 11,
+    "tests/test_parser.py": 13,
+    "tests/test_web.py": 10
+  },
+  "total": 117
+}

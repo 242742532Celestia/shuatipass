@@ -1,14 +1,21 @@
 """shuatipass 解析器测试"""
-import pytest
-import json
-from pathlib import Path
+
 from dataclasses import asdict
+from pathlib import Path
 
-from shuatipass.parser import XueKeWangParserV3, Question, Topic, ParsedDocument
-from shuatipass.parser import HEADER_RE, QUESTION_RE, OPTION_RE
+import pytest
 
+from shuatipass.parser import (
+    HEADER_RE,
+    OPTION_RE,
+    QUESTION_RE,
+    ParsedDocument,
+    Question,
+    XueKeWangParserV3,
+)
 
 # === 正则测试 ===
+
 
 class TestRegex:
     def test_header(self):
@@ -46,6 +53,7 @@ class TestRegex:
 
 
 # === 数据类测试 ===
+
 
 class TestDataclasses:
     def test_question_defaults(self):
@@ -106,7 +114,9 @@ class TestParserIntegration:
             for q in t.questions:
                 if q.type == "single_choice":
                     single_choice_count += 1
-                    assert len(q.options) == 4, f"题 {q.id} 选择题应该 4 个选项，实测 {len(q.options)}"
+                    assert (
+                        len(q.options) == 4
+                    ), f"题 {q.id} 选择题应该 4 个选项，实测 {len(q.options)}"
         assert single_choice_count > 100
 
     def test_images_extracted(self, tmp_path):

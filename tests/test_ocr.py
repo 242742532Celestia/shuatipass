@@ -1,17 +1,17 @@
 """shuatipass OCR 测试（不需要真实 API key）"""
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+
 import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from shuatipass.ocr import (
-    OCRError,
     MathpixOCR,
-    Pix2TexOCR,
-    ocr_questions,
+    OCRError,
     make_ocr_from_env,
+    ocr_questions,
 )
-
 
 SAMPLE_PDF = Path(__file__).parent.parent / "data" / "input" / "物理-高考真题-学科网.pdf"
 
@@ -59,6 +59,7 @@ class TestMathpixOCR:
     def test_recognize_no_requests(self, tmp_path):
         """requests 没装时的错误处理"""
         from shuatipass import ocr as ocr_mod
+
         with patch.object(ocr_mod, "HAS_REQUESTS", False):
             with pytest.raises(OCRError, match="requests"):
                 ocr = MathpixOCR("id", "key")
@@ -178,31 +179,25 @@ class TestOCRQuestions:
 class TestOCRCLI:
     """CLI 集成测试"""
 
-    def test_ocr_help(self):
-        import subprocess
-        result = subprocess.run(
-            ["shuatipass", "ocr", "--help"],
-            capture_output=True, text=True,
-        )
+    def test_ocr_help(self, run_cli):
+        result = run_cli("ocr", "--help")
         assert result.returncode == 0
         assert "ocr" in result.stdout
         assert "mathpix" in result.stdout
 
-    def test_ocr_no_credentials(self, tmp_path, monkeypatch):
+    def test_ocr_no_credentials(self, tmp_path, monkeypatch, run_cli):
         """没 key 时给出友好提示"""
         monkeypatch.delenv("MATHPIX_APP_ID", raising=False)
         monkeypatch.delenv("MATHPIX_APP_KEY", raising=False)
-        import subprocess
+
         # 创建 JSON + 图片目录（都存在，但 topics 为空）
         (tmp_path / "q.json").write_text('{"topics":[]}', encoding="utf-8")
         img_dir = tmp_path / "imgs"
         img_dir.mkdir()
-        result = subprocess.run(
-            ["shuatipass", "ocr", str(tmp_path / "q.json"), "--images", str(img_dir)],
-            capture_output=True, text=True,
-        )
+        result = run_cli("ocr", str(tmp_path / "q.json"), "--images", str(img_dir))
         assert result.returncode != 0
         output = result.stdout + result.stderr
         # 应该报"未配置 OCR 引擎"或"Mathpix 需要 app_id"
-        assert any(kw in output for kw in ["OCR 引擎", "未配置", "app_id"]), \
-            f"Unexpected output: {output}"
+        assert any(
+            kw in output for kw in ["OCR 引擎", "未配置", "app_id"]
+        ), f"Unexpected output: {output}"

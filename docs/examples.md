@@ -167,7 +167,7 @@ for pdf_path in Path(".").glob("*.pdf"):
 组卷网（zujuan.com）的 PDF 格式和学科网略有不同。写一个 YAML：
 
 ```yaml
-# configs/zujuan.yaml
+# src/shuatipass/configs/zujuan.yaml
 name: 组卷网
 description: 组卷网题库 PDF 解析
 
@@ -187,7 +187,7 @@ skip_exact_lines: []
 使用：
 
 ```bash
-shuatipass parse 组卷网-数学.pdf -o out.json --config configs/zujuan.yaml
+shuatipass parse 组卷网-数学.pdf -o out.json --config src/shuatipass/configs/zujuan.yaml
 ```
 
 ## 9. 在 Jupyter Notebook 里交互探索

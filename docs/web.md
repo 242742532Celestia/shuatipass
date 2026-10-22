@@ -179,10 +179,19 @@ sudo ufw allow 7860  # Ubuntu
 python3 -m pytest tests/test_web.py -v
 ```
 
-6 个测试：
+10 个测试：
 - `test_is_available` —— gradio 装了
 - `test_build_ui` —— UI 能构建
 - `test_parse_pdf_no_pdf` —— 无 PDF 错误处理
 - `test_parse_pdf_missing` —— PDF 不存在
 - `test_parse_pdf_real` —— 真实 PDF 端到端
 - `test_launch_web_no_gradio` —— gradio 不可用报错
+- `test_callback_returns_three_values` —— 事件回调返回值个数 == outputs 个数
+- `test_outputs_count_matches_callback` —— outputs 列表长度和回调返回值对得上
+- `test_outputs_order_matches_callback` —— outputs 顺序（文件/统计/预览）和返回值对得上
+- `test_error_message_reaches_stats_pane` —— 出错时错误信息显示在统计栏（不是 File 组件）
+
+> 🔴 后 4 个是**接线契约**测试，不装 gradio 也能跑。
+> 之前 Web UI 的「解析」按钮点了就炸（outputs 接的是 4 元组、还错位），
+> 就是因为这类断言根本不存在 —— 而且 gradio 只在**点击时**才校验数量，
+> build 阶段根本不报错。

@@ -4,40 +4,57 @@ shuatipass Web UI —— Gradio 实现
 启动: shuatipass web [--port 7860] [--host 0.0.0.0]
 浏览器访问: http://localhost:7860
 """
+
 from __future__ import annotations
+
 import json
-import shutil
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 try:
     import gradio as gr
+
     HAS_GRADIO = True
 except ImportError:
     HAS_GRADIO = False
 
-from .parser import XueKeWangParser
-from .config import get_builtin, list_builtins
+from .config import get_builtin
 from .detect import detect_config
-
+from .parser import XueKeWangParser
 
 PRESETS = ["auto", "xuekewang", "generic", "zujuan", "textbook"]
+
+
+class _NoopProgress:
+    """gradio 不可用时的空进度回调。
+
+    🔴 没有它，`_parse_pdf` 在没装 gradio 的机器上会直接 NameError
+    （原注释写"gradio 可能还没装"，但代码却直接用了 gr.Progress()），
+    于是这个函数没法当纯库函数调用，也没法被不依赖 gradio 的测试覆盖。
+    """
+
+    def __call__(self, *args, **kwargs) -> None:
+        return None
 
 
 def _parse_pdf(
     pdf_path: str,
     preset: str,
-    progress: Optional[gr.Progress] = None,
-) -> tuple[str, str, str, Optional[str]]:
+    progress: gr.Progress | _NoopProgress | None = None,
+) -> tuple[str, str, str, str | None]:
     """
-    Gradio 调用的解析函数
+    Gradio 调用的解析函数（也可当纯库函数用）
 
     Returns: (json_str, stats_text, preview_md, json_file_path)
     """
     if progress is None:
-        # 延迟初始化（gradio 可能还没装）
-        progress = gr.Progress()
+        # 🔴 这里**不**自己造 gr.Progress()：
+        #   ① gradio 没装时那会直接 NameError；
+        #   ② 自己造的进度条在非请求上下文里也不生效。
+        # 真正的 UI 路径是 _build_ui → _on_parse，gradio 会把 progress
+        # 按参数名注入给 _on_parse（SPECIAL_ARGS = {"progress", ...}），
+        # 由它透传下来。所以走到这里就说明不是 gradio 调的 → 用空实现。
+        progress = _NoopProgress()
 
     if not pdf_path:
         return "❌ 请先上传 PDF", "", "", None
@@ -75,6 +92,7 @@ def _parse_pdf(
 
     # 写 JSON
     from dataclasses import asdict
+
     json_path = out_dir / "questions.json"
     json_path.write_text(
         json.dumps(asdict(result), ensure_ascii=False, indent=2),
@@ -83,22 +101,24 @@ def _parse_pdf(
 
     # 统计文本
     s = result.stats
-    stats_text = f"## 📊 统计\n\n"
+    stats_text = "## 📊 统计\n\n"
     stats_text += f"- **文件**: {pdf.name}\n"
     stats_text += f"- **总页数**: {result.total_pages}\n"
     stats_text += f"- **专题数**: {s['total_topics']}\n"
     stats_text += f"- **题目数**: {s['total_questions']}\n"
     stats_text += f"- **跳过页**: {s['skipped_pages']}（考点分析页）\n"
     stats_text += f"- **使用配置**: {preset_name}\n"
-    stats_text += f"\n### 题型分布\n\n"
+    stats_text += "\n### 题型分布\n\n"
     for t, c in s["by_type"].items():
         stats_text += f"- `{t}`: {c} 题\n"
 
     # 专题列表
-    stats_text += f"\n### 专题列表\n\n"
+    stats_text += "\n### 专题列表\n\n"
     for t in asdict(result)["topics"]:
         n = len(t["questions"])
-        stats_text += f"- {t['topic_id']} **{t['title']}**: p{t['page_start']}-{t['page_end']} ({n} 题)\n"
+        stats_text += (
+            f"- {t['topic_id']} **{t['title']}**: p{t['page_start']}-{t['page_end']} ({n} 题)\n"
+        )
 
     # 题目预览（Markdown）
     progress(0.9, desc="生成预览...")
@@ -122,15 +142,46 @@ def _parse_pdf(
                 img_path = img_dir / img_name
                 if img_path.exists():
                     import base64
+
                     b64 = base64.b64encode(img_path.read_bytes()).decode()
                     ext = img_path.suffix.lstrip(".")
                     mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
-                    preview_md += f"\n<img src=\"data:{mime};base64,{b64}\" width=\"300\"/>\n\n"
+                    preview_md += f'\n<img src="data:{mime};base64,{b64}" width="300"/>\n\n'
             preview_md += "\n---\n\n"
 
     progress(1.0, desc="✅ 完成")
 
-    return json.dumps(asdict(result), ensure_ascii=False, indent=2), stats_text, preview_md, str(json_path)
+    return (
+        json.dumps(asdict(result), ensure_ascii=False, indent=2),
+        stats_text,
+        preview_md,
+        str(json_path),
+    )
+
+
+def _on_parse(
+    pdf_path: str,
+    preset: str,
+    progress: gr.Progress | None = None,
+) -> tuple[str | None, str, str]:
+    """
+    Gradio 事件回调：把 _parse_pdf 的 4 元组适配成 3 个 UI 输出。
+
+    ⚠️ 返回顺序必须和 _build_ui 里 outputs 的顺序严格一一对应：
+        outputs = [json_download, stats_output, preview_output]
+        即（下载文件 / 统计 / 预览）。
+
+    🔴 原来写的是 outputs=[gr.File(...), stats_output, preview_output] 去接 4 元组
+    —— 数量对不上、顺序还错位。Gradio 在点击时会抛
+    "Number of output components does not match..."，也就是说
+    **Web UI 的「解析」按钮点了就炸**。这里做显式适配把它修掉。
+    """
+    json_str, stats_text, preview_md, file_path = _parse_pdf(pdf_path, preset, progress)
+    if file_path is None:
+        # 出错时 _parse_pdf 把错误信息放在第一个返回值里，
+        # 而 File 组件显示不了错误字符串 → 改显示到统计栏
+        return None, json_str, ""
+    return file_path, stats_text, preview_md
 
 
 def _build_ui():
@@ -138,15 +189,13 @@ def _build_ui():
     with gr.Blocks(
         title="shuatipass · 中文题库 PDF 解析",
     ) as demo:
-        gr.Markdown(
-            """
+        gr.Markdown("""
             # 📚 shuatipass · 中文题库 PDF 解析工具
 
             把 PDF 题库（学科网/组卷网/教辅资料）一键转结构化 JSON。
 
             ---
-            """
-        )
+            """)
 
         with gr.Tab("📤 解析 PDF"):
             with gr.Row():
@@ -180,14 +229,17 @@ def _build_ui():
 
             # 事件
             parse_btn.click(
-                fn=_parse_pdf,
+                fn=_on_parse,
                 inputs=[pdf_input, preset_input],
-                outputs=[gr.File(label="下载 JSON", interactive=False), stats_output, preview_output],
+                outputs=[
+                    json_download,
+                    stats_output,
+                    preview_output,
+                ],
             )
 
         with gr.Tab("📖 使用说明"):
-            gr.Markdown(
-                """
+            gr.Markdown("""
                 ## 三步上手
 
                 ### 1. 上传 PDF
@@ -226,21 +278,19 @@ def _build_ui():
 
                 或从 GitHub 安装最新版：
                 ```bash
-                pip install git+https://github.com/yourname/shuatipass.git
+                pip install git+https://github.com/242742532Celestia/shuatipass.git
                 ```
-                """
-            )
+                """)
 
         with gr.Tab("🔧 关于"):
-            gr.Markdown(
-                """
+            gr.Markdown("""
                 ## shuatipass
 
                 中文圈首个面向开发者的题库 PDF 解析工具。
 
-                - 🐙 GitHub: https://github.com/yourname/shuatipass
+                - 🐙 GitHub: https://github.com/242742532Celestia/shuatipass
                 - 📦 PyPI: https://pypi.org/project/shuatipass/
-                - 📖 文档: https://github.com/yourname/shuatipass#readme
+                - 📖 文档: https://github.com/242742532Celestia/shuatipass#readme
                 - 📜 License: MIT
 
                 ## 路线图
@@ -257,9 +307,8 @@ def _build_ui():
 
                 ## 反馈
 
-                Bug / Feature Request：https://github.com/yourname/shuatipass/issues
-                """
-            )
+                Bug / Feature Request：https://github.com/242742532Celestia/shuatipass/issues
+                """)
 
     return demo
 
@@ -268,16 +317,13 @@ def launch_web(
     host: str = "127.0.0.1",
     port: int = 7860,
     share: bool = False,
-    server_name: Optional[str] = None,
-    server_port: Optional[int] = None,
+    server_name: str | None = None,
+    server_port: int | None = None,
     **kwargs,
 ):
     """启动 Web UI"""
     if not HAS_GRADIO:
-        raise ImportError(
-            "需要安装 gradio: pip install gradio\n"
-            "或: pip install shuatipass[web]"
-        )
+        raise ImportError("需要安装 gradio: pip install gradio\n" "或: pip install shuatipass[web]")
 
     demo = _build_ui()
     demo.launch(

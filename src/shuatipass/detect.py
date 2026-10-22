@@ -9,13 +9,15 @@ shuatipass 自动检测 —— 根据 PDF 内容判断用哪个配置
 简单但有效 —— 覆盖 90% 场景。
 复杂场景用户用 --preset/--config 显式指定。
 """
+
 from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional
 
 # 尝试导入 pymupdf（detect 阶段不依赖 shuatipass 主包）
 try:
     import pymupdf
+
     HAS_PYMUPDF = True
 except ImportError:
     HAS_PYMUPDF = False
@@ -24,20 +26,50 @@ except ImportError:
 # 配置特征关键词
 DETECTION_RULES = [
     # (config_name, keywords, weight, min_hits)
-    ("xuekewang", [
-        "学科网", "xueke100", "xueke", "北京）股份", "股 份有限",
-    ], 3, 2),
-    ("zujuan", [
-        "组卷网", "zujuan", "zujuan.com", "学科网组卷", "组卷",
-    ], 3, 2),
-    ("textbook", [
-        "人教版", "北师大版", "苏教版", "沪教版", "浙教版", "粤教版",
-        "鲁教版", "教科版", "冀教版",
-    ], 2, 1),
+    (
+        "xuekewang",
+        [
+            "学科网",
+            "xueke100",
+            "xueke",
+            "北京）股份",
+            "股 份有限",
+        ],
+        3,
+        2,
+    ),
+    (
+        "zujuan",
+        [
+            "组卷网",
+            "zujuan",
+            "zujuan.com",
+            "学科网组卷",
+            "组卷",
+        ],
+        3,
+        2,
+    ),
+    (
+        "textbook",
+        [
+            "人教版",
+            "北师大版",
+            "苏教版",
+            "沪教版",
+            "浙教版",
+            "粤教版",
+            "鲁教版",
+            "教科版",
+            "冀教版",
+        ],
+        2,
+        1,
+    ),
 ]
 
 
-def detect_config(pdf_path: str | Path, sample_pages: int = 3) -> Optional[str]:
+def detect_config(pdf_path: str | Path, sample_pages: int = 3) -> str | None:
     """
     自动检测 PDF 来源，返回最匹配的配置名。
 

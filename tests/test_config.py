@@ -1,6 +1,7 @@
 """shuatipass 配置测试"""
+
 import pytest
-from pathlib import Path
+
 from shuatipass.config import ParseConfig, get_builtin, list_builtins
 
 

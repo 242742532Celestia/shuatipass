@@ -8,12 +8,14 @@ shuatipass 错题本 —— 借鉴 DEEPTUTOR 的 Personal Notebook
 4. 输出错题本 JSON + HTML 报告
 5. 支持"标记错题"和"取消标记"
 """
+
 from __future__ import annotations
+
 import json
-from pathlib import Path
-from typing import Optional
 from collections import defaultdict
-from dataclasses import dataclass, field, asdict
+from pathlib import Path
+
+from ._console import enable_console_compat
 
 
 def load_questions(json_path: str | Path) -> list[dict]:
@@ -22,7 +24,7 @@ def load_questions(json_path: str | Path) -> list[dict]:
     if not p.exists():
         raise FileNotFoundError(f"JSON 不存在: {p}")
 
-    with p.open() as f:
+    with p.open(encoding="utf-8") as f:
         data = json.load(f)
 
     questions = []
@@ -55,7 +57,7 @@ def mark_questions(
     question_ids: list[str],
     action: str = "mark",  # mark / unmark
     tag: str = "错题",
-    output: Optional[str | Path] = None,
+    output: str | Path | None = None,
 ) -> dict:
     """
     标记/取消标记错题
@@ -71,7 +73,7 @@ def mark_questions(
         {"marked": N, "unmarked": N, "not_found": [...]}
     """
     p = Path(json_path)
-    with p.open() as f:
+    with p.open(encoding="utf-8") as f:
         data = json.load(f)
 
     marked_count = 0
@@ -168,7 +170,7 @@ def build_wrongbook(
 def render_wrongbook_html(wrongbook: dict, title: str = "错题本") -> str:
     """渲染错题本为 HTML（适合打印）"""
     html = [f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>{title}</title>"]
-    html.append('''<style>
+    html.append("""<style>
 body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 20px; color: #222; }
 h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
 h2 { background: #fff3e0; padding: 10px 16px; border-left: 4px solid #ff9800; margin-top: 32px; }
@@ -183,18 +185,18 @@ h2 { background: #fff3e0; padding: 10px 16px; border-left: 4px solid #ff9800; ma
 .q .opt { background: #f5f5f5; padding: 6px 10px; border-radius: 4px; font-size: 14px; }
 .q .answer { background: #e8f5e9; padding: 8px 12px; border-left: 3px solid #4caf50; margin-top: 12px; font-size: 14px; }
 .summary { background: #f3e5f5; padding: 12px 20px; border-radius: 6px; margin: 16px 0; }
-</style></head><body>''')
+</style></head><body>""")
     html.append(f"<h1>📒 {title}</h1>")
-    html.append(f'<div class="summary">')
+    html.append('<div class="summary">')
     html.append(f'<b>总题数</b>: {wrongbook["total"]} | ')
     html.append(f'<b>分组数</b>: {wrongbook["groups_count"]} | ')
     html.append(f'<b>分组方式</b>: {wrongbook["group_by"]}<br>')
     html.append(f'<b>题型分布</b>: {wrongbook["stats"]["by_type"]} | ')
     html.append(f'<b>年份分布</b>: {wrongbook["stats"]["by_year"]}')
-    html.append('</div>')
+    html.append("</div>")
 
     for group_name, qs in wrongbook["groups"].items():
-        html.append(f'<h2>{group_name}（{len(qs)} 题）</h2>')
+        html.append(f"<h2>{group_name}（{len(qs)} 题）</h2>")
         for q in qs:
             html.append('<div class="q">')
             html.append('<div class="meta">')
@@ -204,27 +206,29 @@ h2 { background: #fff3e0; padding: 10px 16px; border-left: 4px solid #ff9800; ma
             if q.get("province"):
                 html.append(f'<span class="badge">{q.get("province")}</span>')
             html.append(f'<span class="badge type">{q.get("type", "")}</span>')
-            html.append(f'<span style="color:#999">题号 {q.get("number", "")} · p{q.get("source_page", "")}</span>')
-            html.append('</div>')
+            html.append(
+                f'<span style="color:#999">题号 {q.get("number", "")} · p{q.get("source_page", "")}</span>'
+            )
+            html.append("</div>")
             html.append(f'<div class="stem">{q.get("stem", "")}</div>')
             if q.get("options"):
                 html.append('<div class="options">')
                 for k, v in q["options"].items():
                     html.append(f'<div class="opt"><b>{k}.</b> {v}</div>')
-                html.append('</div>')
+                html.append("</div>")
             # 答案
             answer = q.get("answer", "")
             explanation = q.get("explanation", "")
             if answer or explanation:
                 html.append('<div class="answer">')
                 if answer:
-                    html.append(f'<b>答案</b>: {answer}<br>')
+                    html.append(f"<b>答案</b>: {answer}<br>")
                 if explanation:
-                    html.append(f'<b>解析</b>: {explanation}')
-                html.append('</div>')
-            html.append('</div>')
+                    html.append(f"<b>解析</b>: {explanation}")
+                html.append("</div>")
+            html.append("</div>")
 
-    html.append('</body></html>')
+    html.append("</body></html>")
     return "\n".join(html)
 
 
@@ -252,6 +256,7 @@ def export_wrongbook(
     Returns:
         wrongbook dict
     """
+    enable_console_compat()  # Windows GBK 控制台扛不住 emoji
     all_questions = load_questions(source_json)
 
     if ids:
@@ -260,7 +265,7 @@ def export_wrongbook(
         questions = find_by_tag(all_questions, tag)
 
     if not questions:
-        print(f"⚠️  没找到符合条件的题目")
+        print("⚠️  没找到符合条件的题目")
         return {"total": 0, "groups": {}, "stats": {}}
 
     wrongbook = build_wrongbook(questions, group_by=group_by)

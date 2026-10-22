@@ -3,14 +3,17 @@ shuatipass 配置 —— 让用户自定义"什么样的 PDF 算一道题"
 
 通过 YAML 配置文件，用户可以为不同来源/格式的题库 PDF 定义解析规则。
 """
+
 from __future__ import annotations
+
 import re
+import sys
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import Optional
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -29,12 +32,15 @@ def _coerce_str(item) -> str:
 @dataclass
 class ParseConfig:
     """解析配置"""
+
     name: str = "学科网"
     description: str = ""
 
     # 必填：4 个核心正则
     header_pattern: str = r"专题\s*(\d+)\s+(\S+?)\s*\n\s*(\d+)\s*/\s*(\d+)\s*\n"
-    question_pattern: str = r"^(\d+)\s*[．\.]\s*[（(]\s*(\d{4})\s*[·\.]\s*([^·）\)]+?)\s*[·\.]\s*(?:高考真题|高考|真题|模拟)?\s*[）)]\s*"
+    question_pattern: str = (
+        r"^(\d+)\s*[．\.]\s*[（(]\s*(\d{4})\s*[·\.]\s*([^·）\)]+?)\s*[·\.]\s*(?:高考真题|高考|真题|模拟)?\s*[）)]\s*"
+    )
     option_pattern: str = r"^([A-D])[．\.]\s*(.*)$"
     has_question_pattern: str = r"\d+\s*[．\.]\s*[（(]\s*\d{4}\s*[·\.]"
     topic_title_pattern: str = r"专题\s*(\d+)\s+(\S+?)\s*$"
@@ -42,19 +48,29 @@ class ParseConfig:
     # 可选：行为配置
     option_keys: list = field(default_factory=lambda: ["A", "B", "C", "D"])
     essay_keywords: list = field(default_factory=lambda: ["求", "证明", "计算", "（1）", "(1)"])
-    skip_patterns: list = field(default_factory=lambda: [
-        "学科 网", "股 份", "有限公司", "考点", "命题趋势",
-    ])
-    skip_exact_lines: list = field(default_factory=lambda: [
-        "考点", "五年考情（2021-2025）", "命题趋势",
-    ])
+    skip_patterns: list = field(
+        default_factory=lambda: [
+            "学科 网",
+            "股 份",
+            "有限公司",
+            "考点",
+            "命题趋势",
+        ]
+    )
+    skip_exact_lines: list = field(
+        default_factory=lambda: [
+            "考点",
+            "五年考情（2021-2025）",
+            "命题趋势",
+        ]
+    )
 
     # 编译后的正则（运行时填充）
-    _header_re: Optional[re.Pattern] = field(default=None, repr=False, compare=False)
-    _question_re: Optional[re.Pattern] = field(default=None, repr=False, compare=False)
-    _option_re: Optional[re.Pattern] = field(default=None, repr=False, compare=False)
-    _has_question_re: Optional[re.Pattern] = field(default=None, repr=False, compare=False)
-    _topic_title_re: Optional[re.Pattern] = field(default=None, repr=False, compare=False)
+    _header_re: re.Pattern | None = field(default=None, repr=False, compare=False)
+    _question_re: re.Pattern | None = field(default=None, repr=False, compare=False)
+    _option_re: re.Pattern | None = field(default=None, repr=False, compare=False)
+    _has_question_re: re.Pattern | None = field(default=None, repr=False, compare=False)
+    _topic_title_re: re.Pattern | None = field(default=None, repr=False, compare=False)
     _skip_res: list = field(default_factory=list, repr=False, compare=False)
 
     def compile(self):
@@ -68,7 +84,7 @@ class ParseConfig:
             self._skip_res = [re.compile(p, re.MULTILINE) for p in self.skip_patterns]
             return True
         except re.error as e:
-            raise ValueError(f"配置 {self.name} 正则编译失败: {e}")
+            raise ValueError(f"配置 {self.name} 正则编译失败: {e}") from e
 
     @property
     def header_re(self) -> re.Pattern:
@@ -125,7 +141,7 @@ class ParseConfig:
         return yaml.safe_dump(d, allow_unicode=True, sort_keys=False)
 
     @classmethod
-    def from_yaml(cls, yaml_text: str) -> "ParseConfig":
+    def from_yaml(cls, yaml_text: str) -> ParseConfig:
         """从 YAML 文本加载"""
         if not HAS_YAML:
             raise ImportError("需要安装 pyyaml: pip install pyyaml")
@@ -141,7 +157,7 @@ class ParseConfig:
         return cfg
 
     @classmethod
-    def load(cls, path: str | Path) -> "ParseConfig":
+    def load(cls, path: str | Path) -> ParseConfig:
         """从 YAML 文件加载"""
         p = Path(path)
         if not p.exists():
@@ -151,9 +167,38 @@ class ParseConfig:
 
 # === 内置预设 ===
 
+
+def _builtin_dir() -> Path | None:
+    """找内置配置目录，返回第一个存在的（都不存在则 None）。
+
+    🔴 原来这里写死 ``Path(__file__).parent.parent.parent / "configs"``，
+    那个路径只在**源码树**里成立：src/shuatipass/config.py → <repo>/configs ✔。
+    装成 wheel 之后 __file__ 在 site-packages/shuatipass/ 下，同一行指向
+    <prefix>/lib/python3.11/configs（不存在），而 data-files 装出来的其实在
+    <prefix>/configs ⇒ **装完 PyPI 包后 get_builtin() 直接 FileNotFoundError**，
+    整个包解析不了任何 PDF。
+
+    现在按顺序试多个候选：
+      ① 包内 <package>/configs —— 打包的标准位置（configs 随包走）
+      ② 源码树 <repo>/configs —— 直接在 checkout 里跑
+      ③ <prefix>/configs —— 兼容旧的 data-files 布局（已装过的旧版）
+    """
+    here = Path(__file__).resolve().parent
+    for candidate in (
+        here / "configs",
+        here.parent.parent.parent / "configs",
+        Path(sys.prefix) / "configs",
+    ):
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
 def get_builtin(name: str) -> ParseConfig:
     """获取内置预设配置"""
-    builtin_dir = Path(__file__).parent.parent.parent / "configs"
+    builtin_dir = _builtin_dir()
+    if builtin_dir is None:
+        raise FileNotFoundError(f"找不到内置配置目录（包内 configs/ 缺失，name={name}）")
     path = builtin_dir / f"{name}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"内置配置不存在: {name}（{path}）")
@@ -162,7 +207,7 @@ def get_builtin(name: str) -> ParseConfig:
 
 def list_builtins() -> list[str]:
     """列出所有内置预设"""
-    builtin_dir = Path(__file__).parent.parent.parent / "configs"
-    if not builtin_dir.exists():
+    builtin_dir = _builtin_dir()
+    if builtin_dir is None:
         return []
-    return [p.stem for p in builtin_dir.glob("*.yaml")]
+    return sorted(p.stem for p in builtin_dir.glob("*.yaml"))

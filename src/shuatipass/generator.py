@@ -37,15 +37,17 @@ shuatipass AI 出题 —— 基于种子题库或知识点生成新题
         "source_page": 0,
     }
 """
+
 from __future__ import annotations
+
 import json
 import os
-import time
 import random
-from pathlib import Path
-from typing import Optional
+import time
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
+from ._console import enable_console_compat
 
 # 难度映射
 DIFFICULTY_LEVELS = ["easy", "medium", "hard", "expert"]
@@ -102,13 +104,14 @@ class GeneratedQuestion:
 
 # ======== LLM 调用 ========
 
+
 def call_llm(provider: str, model: str, prompt: str, temperature: float = 0.7) -> str:
     """调用 LLM（统一接口）"""
     if provider == "anthropic":
         try:
             import anthropic
         except ImportError:
-            raise RuntimeError("需要安装 anthropic: pip install anthropic")
+            raise RuntimeError("需要安装 anthropic: pip install anthropic") from None
         client = anthropic.Anthropic()
         resp = client.messages.create(
             model=model,
@@ -121,7 +124,7 @@ def call_llm(provider: str, model: str, prompt: str, temperature: float = 0.7) -
     try:
         from openai import OpenAI
     except ImportError:
-        raise RuntimeError("需要安装 openai: pip install openai")
+        raise RuntimeError("需要安装 openai: pip install openai") from None
 
     cfg = PROVIDERS[provider]
     api_key = os.environ.get(cfg["env_key"])
@@ -138,6 +141,7 @@ def call_llm(provider: str, model: str, prompt: str, temperature: float = 0.7) -
 
 
 # ======== Prompt 构造 ========
+
 
 def build_prompt(
     topic: str = "",
@@ -231,7 +235,7 @@ def parse_llm_response(resp: str) -> list[dict]:
     try:
         data = json.loads(resp)
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"LLM 返回不是有效 JSON: {e}\n原始: {resp[:500]}")
+        raise RuntimeError(f"LLM 返回不是有效 JSON: {e}\n原始: {resp[:500]}") from e
 
     questions = data.get("questions", [])
     if not questions:
@@ -241,6 +245,7 @@ def parse_llm_response(resp: str) -> list[dict]:
 
 
 # ======== 主出题函数 ========
+
 
 def generate_questions(
     provider: str = "minimax",
@@ -270,6 +275,7 @@ def generate_questions(
     Returns:
         GeneratedQuestion 列表
     """
+    enable_console_compat()  # Windows GBK 控制台扛不住 emoji
     if model is None:
         model = PROVIDERS.get(provider, {}).get("default_model", "gpt-4o-mini")
 
@@ -330,6 +336,7 @@ def auto_infer_topic(questions: list) -> str:
 
 # ======== Mock 试卷生成 ========
 
+
 def generate_mock_exam(
     seed_json: str | Path,
     count: int = 20,
@@ -343,8 +350,9 @@ def generate_mock_exam(
 
     从 seed_json 选 count 道题（按 topic_ids 过滤），调 LLM 生成同结构新题。
     """
+    enable_console_compat()  # Windows GBK 控制台扛不住 emoji
     src = Path(seed_json)
-    with src.open() as f:
+    with src.open(encoding="utf-8") as f:
         data = json.load(f)
 
     # 收集所有题目（可选 topic_ids 过滤）
@@ -353,16 +361,18 @@ def generate_mock_exam(
         if topic_ids and t.get("topic_id") not in topic_ids:
             continue
         for q in t.get("questions", []):
-            pool.append({
-                "id": q.get("id"),
-                "topic_id": t.get("topic_id"),
-                "topic_title": t.get("title"),
-                "stem": q.get("stem"),
-                "options": q.get("options"),
-                "year": q.get("year"),
-                "province": q.get("province"),
-                "type": q.get("type"),
-            })
+            pool.append(
+                {
+                    "id": q.get("id"),
+                    "topic_id": t.get("topic_id"),
+                    "topic_title": t.get("title"),
+                    "stem": q.get("stem"),
+                    "options": q.get("options"),
+                    "year": q.get("year"),
+                    "province": q.get("province"),
+                    "type": q.get("type"),
+                }
+            )
 
     if not pool:
         raise ValueError(f"没找到符合的题目（topic_ids={topic_ids}）")
@@ -379,7 +389,7 @@ def generate_mock_exam(
     for i in range(0, count, batch_size):
         batch_count = min(batch_size, count - i)
         # 选最近的几道做种子
-        batch_seeds = seed[max(0, i-batch_size):i+batch_size]
+        batch_seeds = seed[max(0, i - batch_size) : i + batch_size]
         try:
             batch_questions = generate_questions(
                 provider=provider,
@@ -404,6 +414,7 @@ def generate_mock_exam(
 
 # ======== 保存 ========
 
+
 def save_to_json(
     questions: list[GeneratedQuestion],
     output_path: str | Path,
@@ -419,7 +430,7 @@ def save_to_json(
     if append_to:
         # 追加模式：读原 JSON，把生成题加到合适位置
         src = Path(append_to)
-        with src.open() as f:
+        with src.open(encoding="utf-8") as f:
             data = json.load(f)
 
         # 加到第一个专题（或新建"AI 生成"专题）
@@ -433,12 +444,10 @@ def save_to_json(
             }
             data["topics"].append(gen_topic)
             # 更新统计
-            from dataclasses import asdict as _asdict
+
             existing = data.get("stats", {})
             existing["total_topics"] = len(data["topics"])
-            existing["total_questions"] = sum(
-                len(t.get("questions", [])) for t in data["topics"]
-            )
+            existing["total_questions"] = sum(len(t.get("questions", [])) for t in data["topics"])
             data["stats"] = existing
 
         with out_path.open("w", encoding="utf-8") as f:

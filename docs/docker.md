@@ -251,12 +251,12 @@ bash scripts/test-docker.sh
 docker login
 
 # 2. 标记镜像
-docker tag shuatipass:0.1.0 yourname/shuatipass:0.1.0
-docker tag shuatipass:0.1.0 yourname/shuatipass:latest
+docker tag shuatipass:0.1.0 your-docker-id/shuatipass:0.1.0
+docker tag shuatipass:0.1.0 your-docker-id/shuatipass:latest
 
 # 3. 推送
-docker push yourname/shuatipass:0.1.0
-docker push yourname/shuatipass:latest
+docker push your-docker-id/shuatipass:0.1.0
+docker push your-docker-id/shuatipass:latest
 ```
 
 ## 镜像信息
@@ -264,7 +264,7 @@ docker push yourname/shuatipass:latest
 ```dockerfile
 LABEL org.opencontainers.image.title="shuatipass"
 LABEL org.opencontainers.image.description="中文题库 PDF 解析工具 - 把 PDF 一键转结构化 JSON"
-LABEL org.opencontainers.image.source="https://github.com/yourname/shuatipass"
+LABEL org.opencontainers.image.source="https://github.com/242742532Celestia/shuatipass"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="0.1.0"
 ```

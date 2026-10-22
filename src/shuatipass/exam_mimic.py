@@ -13,25 +13,29 @@ vs 简化版（generate --mock-exam）：
 - 简化版：随机抽种子 + 单 prompt
 - 完整版：风格特征化 + 多 prompt（按章节/题型分批）
 """
-from __future__ import annotations
-import json
-import time
-from pathlib import Path
-from typing import Optional
-from collections import Counter
-from dataclasses import dataclass, field, asdict
 
-from .generator import call_llm, PROVIDERS
+from __future__ import annotations
+
+import json
+from collections import Counter
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+from ._console import enable_console_compat
+from .generator import PROVIDERS, call_llm
 
 
 @dataclass
 class ExamStyle:
     """试卷风格特征"""
+
     # 基础
     total_questions: int = 0
     topic_distribution: dict = field(default_factory=dict)  # {"直线运动": 48, ...}
     # 题型
-    type_distribution: dict = field(default_factory=dict)  # {"single_choice": 684, "essay": 121, ...}
+    type_distribution: dict = field(
+        default_factory=dict
+    )  # {"single_choice": 684, "essay": 121, ...}
     type_ratio: dict = field(default_factory=dict)  # 各题型占比（百分比）
     # 难度
     difficulty_distribution: dict = field(default_factory=dict)  # {"hard": 200, ...}
@@ -55,11 +59,12 @@ def analyze_exam_style(seed_json: str | Path) -> ExamStyle:
     - 年份范围
     - 高频省份
     """
+    enable_console_compat()  # Windows GBK 控制台扛不住 emoji
     p = Path(seed_json)
     if not p.exists():
         raise FileNotFoundError(f"seed JSON 不存在: {p}")
 
-    with p.open() as f:
+    with p.open(encoding="utf-8") as f:
         data = json.load(f)
 
     style = ExamStyle()
@@ -250,7 +255,7 @@ def parse_exam_mimic_response(resp: str) -> list[dict]:
     try:
         data = json.loads(resp)
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"LLM 返回不是有效 JSON: {e}\n原始: {resp[:500]}")
+        raise RuntimeError(f"LLM 返回不是有效 JSON: {e}\n原始: {resp[:500]}") from e
 
     questions = data.get("questions", [])
     if not questions:
@@ -285,6 +290,7 @@ def mimic_exam(
             "stats": {...}
         }
     """
+    enable_console_compat()  # Windows GBK 控制台扛不住 emoji
     if model is None:
         model = PROVIDERS.get(provider, {}).get("default_model", "gpt-4o-mini")
 
@@ -314,6 +320,7 @@ def mimic_exam(
 
     # 6. 包装
     from .generator import GeneratedQuestion
+
     questions = []
     for i, q in enumerate(questions_data, 1):
         gq = GeneratedQuestion(

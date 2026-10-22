@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)]()
 [![Tests](https://img.shields.io/badge/tests-100%20passed-brightgreen)]()
-[![Status: v0.1.0](https://img.shields.io/badge/status-v0.1.0-blue)]()
+[![Status: v0.1.1](https://img.shields.io/badge/status-v0.1.1-blue)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange)]()
 
 ## 它解决什么

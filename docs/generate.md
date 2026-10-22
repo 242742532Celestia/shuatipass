@@ -199,7 +199,7 @@ LLM 偶尔会返回非严格 JSON。脚本会报"不是有效 JSON"。可：
 python3 -m pytest tests/test_generator.py -v
 ```
 
-17 个测试（用 mock 模拟 LLM 响应）：
+19 个测试（用 mock 模拟 LLM 响应）：
 - 4 个 prompt 构造测试
 - 5 个响应解析测试
 - 2 个端到端 mock 测试
