@@ -25,6 +25,15 @@ jobs:
           cache: pip
 
       - name: Install system dependencies
+        # 🔴 只有 3.10 需要。
+        #
+        # PyMuPDF 2.0 在 PyPI 上只发 **cp311-abi3** 的 wheel（Stable ABI，覆盖
+        # 3.11/3.12/3.13），**Python 3.10 拿不到 wheel** → pip 只能从源码编译
+        # → 必须要系统里的 MuPDF 开发头（libmupdf-dev）。
+        #
+        # 之前这一步对**所有**版本都跑，而 apt 源时快时慢 —— 3.10/3.12 两个 job
+        # 在它上面各卡了 10 多分钟（整轮 CI 14 分半）。3.11+ 用 wheel 根本不需要它。
+        if: matrix.python-version == '3.10'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
