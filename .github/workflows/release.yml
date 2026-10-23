@@ -9,7 +9,10 @@ on:
 # --------------------------------------------------------------
 # 原来的写法有两个真 bug：
 #   ① `github-release` job 直接贴 `dist/*.whl`，但 dist/ 是**另一个 job** 的产物
-#      —— 它自己从不 build ⇒ v0.1.0 那个 Release 的 assets 是 **0**（发布页是个空壳）。
+#      —— 它自己从不 build ⇒ workflow **一个附件都没贴上**。
+#      而 `fail_on_unmatched_files` 默认是 false ⇒ 匹配不到文件也**静默成功**，
+#      看起来"发布页建好了"，实际 wheel 一直缺着（v0.1.0 页面上那两个文件
+#      —— tarball 和 RELEASE-v0.1.0.md —— 是**手工**传上去的，不是 workflow 的产物）。
 #   ② PyPI 用 OIDC 信任发布，而项目没在 PyPI 侧注册 ⇒ 必挂，
 #      于是整个 Release workflow 常驻一个红叉。
 #
@@ -17,6 +20,7 @@ on:
 #   build         打包 + twine check + 上传 artifact
 #   publish-pypi  没配 PYPI_API_TOKEN 就 **跳过**（并在日志里明确告警，而不是假装成功）
 #   github-release 贴上 wheel + sdist（这次真有附件了）
+#                 fail_on_unmatched_files: true ⇒ 匹配不到就失败，不再静默
 jobs:
   build:
     name: Build distribution

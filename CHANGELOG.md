@@ -55,10 +55,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OIDC 信任发布要求项目**已在 PyPI 注册**，首次发布必挂 ⇒ 改成
   token secret + 没配就**跳过**（skipped ≠ 失败），并在日志里明确告警。
 
-- **GitHub Release 的附件数是 0**
-  `github-release` job 直接贴 `dist/*.whl`，可那是**另一个 job** 的产物，
-  它自己从不 build ⇒ v0.1.0 的发布页是个空壳。
-  改成 `build → artifact → 下游消费`，`fail_on_unmatched_files: true`。
+- **GitHub Release 上 workflow 一个附件都没贴上（wheel 一直缺着）**
+  旧 workflow 里 `github-release` job 直接贴 `dist/*.whl`，而 `dist/` 是**另一个 job**
+  的产物，它自己从不 build ⇒ 贴了个空。
+  而 `softprops/action-gh-release` 的 `fail_on_unmatched_files` 默认是 **false**
+  ⇒ 匹配不到文件也**静默成功**，看起来"发布页建好了"。
+  （v0.1.0 的发布页上其实有 2 个文件 —— `shuatipass-v0.1.0.tar.gz` 和
+  `RELEASE-v0.1.0.md` —— 但那是**手工**传上去的：文件名是 `shuatipass-v0.1.0.tar.gz`
+  而不是构建产物的 `shuatipass-0.1.0.tar.gz`，体积也对得上 PUBLISH.md 里写的 87 KB。
+  **wheel 从来没上去过** ⇒ 用户没法从发布页直接装。）
+  现在改成 `build → artifact → 下游消费`，并且加上
+  `fail_on_unmatched_files: true` —— 匹配不到就失败，不再静默。
 
 - **占位符**
   16 处 `yourname`（GitHub 地址 11 / Docker Hub 4 / PyPI owner 1）+ CHANGELOG 里的 `<owner>`。

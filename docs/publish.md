@@ -99,8 +99,11 @@ git push origin v0.1.0
 3. **Create GitHub Release** —— 把 wheel + sdist 贴到 Release 页上
 
 > 2026-10-22 之前，第 3 步是坏的：它直接贴 `dist/*.whl`，但 `dist/` 是另一个 job 的产物，
-> 而它自己从不 build ⇒ v0.1.0 那个 Release 的附件数是 **0**，发布页是个空壳。
-> 现在改成 build 一次 → artifact → 两个下游 job 各取所需。
+> 而它自己从不 build ⇒ **workflow 一个附件都没贴上**。
+> 更阴的是 `fail_on_unmatched_files` 默认 **false** —— 匹配不到文件也静默成功，
+> 看起来"发布页建好了"，实际 **wheel 从来没上去**（v0.1.0 页面上那两个文件是手工传的）。
+> 现在改成 build 一次 → artifact → 两个下游 job 各取所需，
+> 并加 `fail_on_unmatched_files: true`：匹配不到就**失败**，不再静默。
 
 ## 发布后验证
 
