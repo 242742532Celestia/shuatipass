@@ -9,17 +9,6 @@
 [![Status: v0.1.1](https://img.shields.io/badge/status-v0.1.1-blue)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange)]()
 
-## 它解决什么
-
-教师/教培/学生手里有大量"扫描版真题集 PDF"（学科网/组卷网/教辅资料），想做：
-- 在线题库系统
-- 班级错题本
-- 智能组卷
-- AI 出题
-- 学情分析
-
-但这些 PDF 是非结构化的，没法直接用。**shuatipass 把它们一键转成 JSON，附带图片库**。
-
 ## 9 个 CLI 子命令
 
 ```bash
